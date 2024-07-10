@@ -1,0 +1,9 @@
+*.pyc
+data/initialize_models
+data/modelnet40_normal_resampled
+data/pretrained_models
+outputs
+
+pretrained_models
+
+.ipynb_checkpoints/

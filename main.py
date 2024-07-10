@@ -105,6 +105,8 @@ def main(args):
         zero_stats = test_zeroshot_3d(args)
         print(zero_stats)
         return
+    
+    # JHY: NOTE: go here
     elif args.evaluate_3d_ulip2:
         zero_stats = test_zeroshot_3d_ulip2(args)
         print(zero_stats)
@@ -471,6 +473,7 @@ def test_zeroshot_3d(args):
 
     return results
 
+# JHY: NOTE: function to focus
 def test_zeroshot_3d_ulip2(args):
     ckpt = torch.load(args.test_ckpt_addr, map_location='cpu')
     state_dict = OrderedDict()
