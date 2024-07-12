@@ -16,7 +16,7 @@ def index_points(points, idx):
         points: input points data, [B, N, C]
         idx: sample index data, [B, S]
     Return:
-        new_points:, indexed points data, [B, S, C]
+        new_points: indexed points data, [B, S, C]
     """
     device = points.device
     B = points.shape[0]
@@ -34,7 +34,7 @@ def fps(xyz, npoint):
         xyz: pointcloud data, [B, N, 3]
         npoint: number of samples
     Return:
-        centroids: sampled pointcloud index, [B, npoint, 3]
+        centroids: sampled pointcloud index, [B, npoint]
     """
     device = xyz.device
     B, N, C = xyz.shape
