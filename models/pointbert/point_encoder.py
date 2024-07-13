@@ -235,6 +235,7 @@ class PointTransformer(nn.Module):
         # ret = self.cls_head_finetune(concat_f)
         return concat_f
     
+# JHY: NOTE: point_encoder for the pointbert
 class PointTransformer_Colored(nn.Module):
     def __init__(self, config, **kwargs):
         super().__init__()

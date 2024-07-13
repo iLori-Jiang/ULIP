@@ -184,6 +184,7 @@ class Group(nn.Module):
         return neighborhood, center
 
 
+# JHY: NOTE: encoder of the point_encoder for the pointbert
 class Encoder(nn.Module):
     def __init__(self, encoder_channel, input_dim=3):
         super().__init__()

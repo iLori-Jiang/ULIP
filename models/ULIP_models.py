@@ -174,6 +174,7 @@ class ULIP_WITH_IMAGE(nn.Module):
                     'logit_scale': self.logit_scale.exp()}
             
             
+# JHY: NOTE: the whole model for the pointbert ulip2 model (including text and image encoder)
 class ULIP2_WITH_OPENCLIP(nn.Module):
     def __init__(self, point_encoder, **kwargs):
         # super().__init__(ssl_mlp_dim, ssl_emb_dim, **kwargs)
@@ -181,6 +182,7 @@ class ULIP2_WITH_OPENCLIP(nn.Module):
         kwargs = EasyDict(kwargs)
 
         self.open_clip_model = kwargs.open_clip_model
+        self.preprocess = kwargs.preprocess
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
@@ -352,6 +354,8 @@ def ULIP_PointBERT(args):
 
     return model
 
+
+# JHY: NOTE: best performance pointbert pretrained by ULIP2 method
 def ULIP2_PointBERT_Colored(args):
     print("Get openclip model:")
     open_clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14',
@@ -368,7 +372,7 @@ def ULIP2_PointBERT_Colored(args):
     pc_feat_dims = 768
     # =====================================================================
 
-    model = ULIP2_WITH_OPENCLIP(open_clip_model=open_clip_model, point_encoder=point_encoder, pc_feat_dims=pc_feat_dims)
+    model = ULIP2_WITH_OPENCLIP(open_clip_model=open_clip_model, preprocess=preprocess, point_encoder=point_encoder, pc_feat_dims=pc_feat_dims)
 
     return model
 
