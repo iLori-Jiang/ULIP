@@ -191,10 +191,10 @@ class ULIP2_WITH_OPENCLIP(nn.Module):
         self.tokenizer = open_clip.get_tokenizer('ViT-bigG-14')
 
         # JHY: NOTE: modify but don't know why
-        # self.pc_projection = nn.Parameter(torch.empty(kwargs.pc_feat_dims, 1280))
-        self.pc_projection = nn.Parameter(torch.empty(kwargs.pc_feat_dims, 512))
-        # nn.init.normal_(self.pc_projection, std=1280 ** -0.5)
-        nn.init.normal_(self.pc_projection, std=512 ** -0.5)
+        self.pc_projection = nn.Parameter(torch.empty(kwargs.pc_feat_dims, 1280))
+        nn.init.normal_(self.pc_projection, std=1280 ** -0.5)
+        # self.pc_projection = nn.Parameter(torch.empty(kwargs.pc_feat_dims, 512))
+        # nn.init.normal_(self.pc_projection, std=512 ** -0.5)
 
     def encode_image(self, image):
         x = self.open_clip_model.encode_image(image)

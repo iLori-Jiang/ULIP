@@ -31,7 +31,7 @@ def create_image_grid(images):
 
 
 class ULIP_ShapeNet(Dataset):
-    def __init__(self, dataset_path=DATASET_ADDRESS, keyword=None, sample_angle_range=60, image_size=512, random_flip=False, prob_use_caption=1):
+    def __init__(self, dataset_path=DATASET_ADDRESS, keyword=None, sample_angle_range=60, image_size=512, pointcloud_size=8192, random_flip=False, prob_use_caption=1):
         self.dataset_path = dataset_path
 
         self.path_caption_data = os.path.join(dataset_path, 'captions')
@@ -51,6 +51,8 @@ class ULIP_ShapeNet(Dataset):
         self.image_size = image_size
         self.random_flip = random_flip
         self.prob_use_caption = prob_use_caption
+
+        self.pointcloud_size = pointcloud_size
 
         self.pil_to_tensor = transforms.PILToTensor()
 
@@ -83,6 +85,45 @@ class ULIP_ShapeNet(Dataset):
 
         p = mp.plot(v, shading=shading, return_plot=True)   # Visualize in .ipynb
     
+
+    def pc_numpy2tensor(self, pc_np):
+        '''
+        input numpy array:  [N, 3]
+        return tensor:      [1, N, 3]
+        '''
+        return torch.from_numpy(pc_np).unsqueeze(0)
+
+
+    def check_normalization(self, pc_tensor):
+
+        '''
+        pc_tensor: [1, N, 3]
+        '''
+
+        min_vals = torch.min(pc_tensor, dim=1).values
+        max_vals = torch.max(pc_tensor, dim=1).values
+        mean_vals = torch.mean(pc_tensor, dim=1)
+
+        range_normalized = False
+        center_normalized = False
+
+        if torch.all(min_vals >= 0) and torch.all(max_vals <= 1):
+            range_normalized = True
+            range_info = "The point cloud range is normalized to [0, 1]."
+        elif torch.all(min_vals >= -1) and torch.all(max_vals <= 1):
+            range_normalized = True
+            range_info = "The point cloud range is normalized to [-1, 1]."
+        else:
+            range_info = "The point cloud range is not normalized."
+
+        if torch.allclose(mean_vals, torch.zeros_like(mean_vals), atol=1e-3):
+            center_normalized = True
+            center_info = "The point cloud is centered at the origin."
+        else:
+            center_info = f"The point cloud is centered at {mean_vals.mean(dim=0).tolist()}."
+
+        return range_info, center_info, range_normalized, center_normalized
+
 
     def process_index(self, index=None, show_images=False):
         if index is None:
@@ -246,14 +287,21 @@ class ULIP_ShapeNet(Dataset):
 
 if __name__ == "__main__":
     # keyword = "chair"
-    keyword = "table"
+    # keyword = "table"
+    keyword = "plane"
     # keyword = None
 
     dataset = ULIP_ShapeNet(keyword=keyword)
     print(len(dataset))
     print(dataset.total_images())
 
-    item = dataset[34]
-    print(item['caption'])
-    print(item['target'].shape)
-    print(item['source'].shape)
+    # item = dataset[34]
+    # print(item['caption'])
+    # print(item['target'].shape)
+    # print(item['source'].shape)
+
+    data = dataset.process_index()
+    range_info, center_info, range_normalized, center_normalized = dataset.check_normalization(dataset.pc_numpy2tensor(data['pointcloud_np']))
+
+    print(range_info)
+    print(center_info)

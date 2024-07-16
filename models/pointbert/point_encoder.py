@@ -256,8 +256,8 @@ class PointTransformer_Colored(nn.Module):
         self.encoder_dims = config.encoder_dims
 
         # JHY: NOTE: modify but don't know why
-        # self.encoder = Encoder(encoder_channel=self.encoder_dims, input_dim=6)
-        self.encoder = Encoder(encoder_channel=self.encoder_dims, input_dim=3)
+        self.encoder = Encoder(encoder_channel=self.encoder_dims, input_dim=6)
+        # self.encoder = Encoder(encoder_channel=self.encoder_dims, input_dim=3)
 
         # bridge encoder and transformer
         self.reduce_dim = nn.Linear(self.encoder_dims, self.trans_dim)
@@ -281,10 +281,10 @@ class PointTransformer_Colored(nn.Module):
 
         self.norm = nn.LayerNorm(self.trans_dim)
 
-        print("training from scratch for pointbert.")
+        # print("training from scratch for pointbert.")
 
         model_size = cal_model_parm_nums(self)
-        print("model size:")
+        print("PointTransformer_Colored model size:")
         print(model_size)
 
     def build_loss_func(self):
