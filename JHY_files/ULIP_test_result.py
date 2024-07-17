@@ -1,3 +1,5 @@
+# ------------------------v1
+
 logits_img_A = img_A_embedding @ class_embeddings.t()
 prob_img_A = F.softmax(logits_img_A, dim=-1)
 
@@ -24,6 +26,7 @@ logits_per_pc = pc_features @ class_embeddings.t()
 print(logits_per_pc)
 
 # tensor([[0.1032, 0.0661, 0.0878]], device='cuda:0')
+# NOTE: shouldn't use the point cloud with the class of image
 
 probabilities = F.softmax(logits_per_pc, dim=-1)
 print(probabilities)
@@ -57,7 +60,7 @@ print(pc_features_mn40 @ pc_features.t())
 print(pc_features_mn40 @ img_A_embedding.t())
 print(pc_features_mn40 @ img_B_embedding.t())
 print(pc_features_mn40 @ text_B_embeddings.t())
-# tensor([[1.0000]], device='cuda:0')
+# tensor([[1.0000]], device='cuda:0')       # NOTE: shouldn't happen, maybe the xyz and rgb should switch?
 # tensor([[0.1140]], device='cuda:0')
 # tensor([[0.1252]], device='cuda:0')
 # tensor([[0.1473]], device='cuda:0')
