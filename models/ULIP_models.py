@@ -181,8 +181,12 @@ class ULIP2_WITH_OPENCLIP(nn.Module):
         super().__init__()
         kwargs = EasyDict(kwargs)
 
-        self.open_clip_model = kwargs.open_clip_model
-        self.preprocess = kwargs.preprocess
+        if kwargs.if_need_clip:
+            self.open_clip_model = kwargs.open_clip_model
+            self.preprocess = kwargs.preprocess
+        else:
+            self.open_clip_model = None
+            self.preprocess = None
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
@@ -357,11 +361,13 @@ def ULIP_PointBERT(args):
 
 # JHY: NOTE: best performance pointbert pretrained by ULIP2 method
 def ULIP2_PointBERT_Colored(args):
-    print("Get openclip model:")
-    open_clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14',
-                                                                          pretrained='laion2b_s39b_b160k')
-    open_clip_model.eval()
-    print("Finished loading the openclip model.")
+
+    if args.if_need_clip:
+        print("Get openclip model:")
+        open_clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14',
+                                                                            pretrained='laion2b_s39b_b160k')
+        open_clip_model.eval()
+        print("Finished loading the openclip model.")
 
     # =====================================================================
     # import the 3D backbone and specify the output point cloud feature dimension
@@ -372,7 +378,10 @@ def ULIP2_PointBERT_Colored(args):
     pc_feat_dims = 768
     # =====================================================================
 
-    model = ULIP2_WITH_OPENCLIP(open_clip_model=open_clip_model, preprocess=preprocess, point_encoder=point_encoder, pc_feat_dims=pc_feat_dims)
+    if args.if_need_clip:
+        model = ULIP2_WITH_OPENCLIP(if_need_clip=args.if_need_clip, open_clip_model=open_clip_model, preprocess=preprocess, point_encoder=point_encoder, pc_feat_dims=pc_feat_dims)
+    else:
+        model = ULIP2_WITH_OPENCLIP(if_need_clip=args.if_need_clip, point_encoder=point_encoder, pc_feat_dims=pc_feat_dims)
 
     return model
 
