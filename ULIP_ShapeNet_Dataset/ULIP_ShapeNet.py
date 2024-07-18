@@ -11,6 +11,10 @@ import copy
 
 import meshplot as mp
 
+try:
+    from .util import pc_numpy2tensor, check_normalization, process_pointcloud
+except ImportError:
+    from util import pc_numpy2tensor, check_normalization, process_pointcloud
 
 
 DATASET_ADDRESS = "/mnt/disk2/iLori/ShapeNet-55-ULIP-2-triplets/"
@@ -37,6 +41,7 @@ class ULIP_ShapeNet(Dataset):
         self.path_caption_data = os.path.join(dataset_path, 'captions')
         self.path_data_pc = os.path.join(dataset_path, "shapenet_pc")
         self.path_data_rgb = os.path.join(dataset_path, "only_rgb_depth_images")
+        self.path_pc_embeddings = os.path.join(dataset_path, "ulip_pc_embeddings")
 
         self.all_angles = np.arange(0, 360, 12)
         self.sample_angle_range = sample_angle_range
@@ -65,6 +70,35 @@ class ULIP_ShapeNet(Dataset):
         return len(self)
     
 
+    def merge_images_horizontally(self, img1, img2):
+        """
+        Merge two PIL images horizontally into one image.
+
+        Args:
+        img1 (PIL.Image): The first image.
+        img2 (PIL.Image): The second image.
+
+        Returns:
+        PIL.Image: A new image consisting of img1 and img2 merged horizontally.
+        """
+        # Determine the new image dimensions
+        width1, height1 = img1.size
+        width2, height2 = img2.size
+        new_width = width1 + width2
+        new_height = max(height1, height2)
+
+        # Create a new image with the appropriate height
+        new_img = Image.new('RGBA', (new_width, new_height))
+
+        # Paste the first image
+        new_img.paste(img1, (0, 0))
+
+        # Paste the second image aligned top
+        new_img.paste(img2, (width1, 0))
+
+        return new_img
+    
+
     def visualize_pointcloud(self, pc_np):
         v = copy.deepcopy(pc_np) ## Just in case anything goes wrong
         # mi = np.min(v, axis=0)
@@ -86,45 +120,6 @@ class ULIP_ShapeNet(Dataset):
         p = mp.plot(v, shading=shading, return_plot=True)   # Visualize in .ipynb
     
 
-    def pc_numpy2tensor(self, pc_np):
-        '''
-        input numpy array:  [N, 3]
-        return tensor:      [1, N, 3]
-        '''
-        return torch.from_numpy(pc_np).unsqueeze(0)
-
-
-    def check_normalization(self, pc_tensor):
-
-        '''
-        pc_tensor: [1, N, 3]
-        '''
-
-        min_vals = torch.min(pc_tensor, dim=1).values
-        max_vals = torch.max(pc_tensor, dim=1).values
-        mean_vals = torch.mean(pc_tensor, dim=1)
-
-        range_normalized = False
-        center_normalized = False
-
-        if torch.all(min_vals >= 0) and torch.all(max_vals <= 1):
-            range_normalized = True
-            range_info = "The point cloud range is normalized to [0, 1]."
-        elif torch.all(min_vals >= -1) and torch.all(max_vals <= 1):
-            range_normalized = True
-            range_info = "The point cloud range is normalized to [-1, 1]."
-        else:
-            range_info = "The point cloud range is not normalized."
-
-        if torch.allclose(mean_vals, torch.zeros_like(mean_vals), atol=1e-3):
-            center_normalized = True
-            center_info = "The point cloud is centered at the origin."
-        else:
-            center_info = f"The point cloud is centered at {mean_vals.mean(dim=0).tolist()}."
-
-        return range_info, center_info, range_normalized, center_normalized
-
-
     def process_index(self, index=None, show_images=False):
         if index is None:
             index = np.random.randint(len(self))
@@ -137,8 +132,11 @@ class ULIP_ShapeNet(Dataset):
         pc_np = np.load(os.path.join(self.path_data_pc, name + ".npy"))
         # print("pc_np.shape: ")
         # print(pc_np.shape)
+
+        pc_embedding_tensor = torch.load(os.path.join(self.path_pc_embeddings, name + ".pt"))
         
         data = {'pointcloud_np': pc_np}
+        data['pointcloud_embedding_tensor'] = pc_embedding_tensor
         
         captions_data = load_json(os.path.join(self.path_caption_data, name + ".json"))
         
@@ -301,7 +299,9 @@ if __name__ == "__main__":
     # print(item['source'].shape)
 
     data = dataset.process_index()
-    range_info, center_info, range_normalized, center_normalized = dataset.check_normalization(dataset.pc_numpy2tensor(data['pointcloud_np']))
+    range_info, center_info, range_normalized, center_normalized = check_normalization(pc_numpy2tensor(data['pointcloud_np']))
 
     print(range_info)
     print(center_info)
+
+    print(data['pointcloud_embedding_tensor'].shape)
