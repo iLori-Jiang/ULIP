@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 import os
 
 from ULIP_ShapeNet_Dataset.ShapeNet_pointcloud_dataset import PointCloudDataset
+from ULIP_ShapeNet_Dataset.util import encode_pointcloud
 
 import torch
 
@@ -28,41 +29,7 @@ def create_fake_args():
     fake_args.batch_size = 128
 
     return fake_args
-    
 
-def encode_pointcloud(pc_tensors, model, if_normalize=False, gpu=0, verbose=False):
-    '''
-    Input:
-    pc_tensors: torch tensor of pointcloud [B, N, 3]
-    
-    Output:
-    pc_embeddings: torch tensor encoded [B, encoder_dim]
-    '''
-
-    assert len(pc_tensors.shape) == 3
-
-    with torch.no_grad():
-
-        if verbose:
-            print("")
-
-        pc_embeddings = model.encode_pc(
-                                        pc_tensors.float().cuda(gpu, non_blocking=True)
-                                        ).float()
-        
-        if if_normalize:
-            pc_embeddings = pc_embeddings / pc_embeddings.norm(dim=-1, keepdim=True)
-
-        if verbose:
-            print("pc_embeddings.shape")
-            print(pc_embeddings.shape)
-            print("pc_embeddings.norm(dim=-1)")
-            print(pc_embeddings.norm(dim=-1))
-
-            print("")
-        
-        return pc_embeddings
-    
 
 def main(path_data_pc, path_data_pc_embeddings, if_test=True):
 

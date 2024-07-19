@@ -142,3 +142,99 @@ def process_pointcloud(pc_xyz_tensor, if_need_rgb=False, if_xyz_rgb=True, verbos
         print("")
 
     return pc_tensor
+
+
+def encode_pointcloud(pc_tensors, model, if_normalize=False, gpu=0, verbose=False):
+    '''
+    Input:
+    pc_tensors: torch tensor of pointcloud [B, N, 3]
+    
+    Output:
+    pc_embeddings: torch tensor encoded [B, encoder_dim]
+    '''
+
+    assert len(pc_tensors.shape) == 3
+
+    with torch.no_grad():
+
+        if verbose:
+            print("")
+
+        pc_embeddings = model.encode_pc(
+                                        pc_tensors.float().cuda(gpu, non_blocking=True)
+                                        ).float()
+        
+        if if_normalize:
+            pc_embeddings = pc_embeddings / pc_embeddings.norm(dim=-1, keepdim=True)
+
+        if verbose:
+            print("pc_embeddings.shape")
+            print(pc_embeddings.shape)
+            print("pc_embeddings.norm(dim=-1)")
+            print(pc_embeddings.norm(dim=-1))
+
+            print("")
+        
+        return pc_embeddings
+
+
+def encode_text(text, model, if_normalize=False, gpu=0, verbose=False):
+    with torch.no_grad():
+
+        text_token = model.tokenizer(text).cuda(gpu, non_blocking=True)
+
+        if verbose:
+            print("")
+            print("text_token.shape: ")
+            print(text_token.shape)
+
+        if len(text_token.shape) < 2:
+            text_token = text_token[None, ...]
+
+            if verbose:
+                print("text_token.shape after checking: ")
+                print(text_token.shape)
+
+        text_embeddings = model.encode_text(text_token).float()
+
+        if if_normalize:
+            text_embeddings = text_embeddings / text_embeddings.norm(dim=-1, keepdim=True)
+        
+        if verbose:
+            print("text_embeddings.shape")
+            print(text_embeddings.shape)
+            print("text_embeddings.norm(dim=-1)")
+            print(text_embeddings.norm(dim=-1))
+
+            print("")
+
+        return text_embeddings
+
+
+def encode_image(image, model, if_normalize=False, gpu=0, verbose=False):
+    with torch.no_grad():
+
+        image_tensor = model.preprocess(image)
+
+        if verbose:
+            # 检查转换后的 tensor 的形状和类型
+            print("")
+            print("image_tensor.shape after preprocess")
+            print(image_tensor.shape)
+
+        img_embedding = model.encode_image(
+                                image_tensor.unsqueeze(0).float().cuda(gpu, non_blocking=True)
+                                ).float()
+        
+        if if_normalize:
+            img_embedding = img_embedding / img_embedding.norm(dim=-1, keepdim=True)
+        
+        if verbose:
+            print("img_embedding.shape")
+            print(img_embedding.shape)
+            print("img_embedding.norm(dim=-1)")
+            print(img_embedding.norm(dim=-1))
+
+            print("")
+
+        return img_embedding
