@@ -210,8 +210,8 @@ class ULIP2_WITH_OPENCLIP(nn.Module):
 
         return x
 
-    def encode_pc(self, pc):
-        pc_feat = self.point_encoder(pc)
+    def encode_pc(self, pc, verbose=False):
+        pc_feat = self.point_encoder(pc, verbose=verbose)
         pc_embed = pc_feat @ self.pc_projection
         return pc_embed
 

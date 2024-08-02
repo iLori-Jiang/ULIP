@@ -161,7 +161,8 @@ def encode_pointcloud(pc_tensors, model, if_normalize=False, gpu=0, verbose=Fals
             print("")
 
         pc_embeddings = model.encode_pc(
-                                        pc_tensors.float().cuda(gpu, non_blocking=True)
+                                        pc_tensors.float().cuda(gpu, non_blocking=True),
+                                        verbose=verbose
                                         ).float()
         
         if if_normalize:

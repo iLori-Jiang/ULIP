@@ -55,14 +55,76 @@ class Attention(nn.Module):
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+
+        '''
+        JHY: NOTE: 
+
+        input:
+        [B, N, C]
+
+        self.qkv(x):
+        -> [B, N, 3*C]
+
+        reshape:
+        -> [B, N, 3 (QKV), head, head_dim (C // head)]
+
+        permute:
+        -> [3, B, head, N, head_dim]
+        '''
+
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
 
+        '''
+        each matrix is [B, head, N, head_dim]
+        '''
+
         attn = (q @ k.transpose(-2, -1)) * self.scale
+
+        '''
+        for each sample, for each head, do similarity [N, head_dim] @ [N, head_dim].T
+
+        output is still [B, head, N, head_dim]
+
+        ----------------------------------------
+        
+        why * scale?
+
+        防止数值过大：
+        查询和键的点积会随着特征维度的增加而变大。这可能导致softmax函数在计算注意力权重时的输出变得非常尖锐 即大部分权重集中在少数位置, 从而影响模型的训练。
+        例如, 如果特征维度很大, 点积的结果也会很大, 导致softmax的输入非常大, 使得softmax函数的梯度非常小, 从而导致梯度消失问题。
+
+        提高训练稳定性：
+        通过缩放因子对点积结果进行缩放, 可以使得点积结果保持在一个适当的范围内, 从而使得softmax函数的输出更加平滑, 梯度更加稳定。
+        '''
+
         attn = attn.softmax(dim=-1)
+
         attn = self.attn_drop(attn)
 
+        '''
+        dropout some dimesion of the attention to 0
+        '''
+
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        '''
+        simply dot product between attention weight and value
+
+        transpose:
+        -> [B, N, head, head_dim]
+
+        reshape merge head:
+        -> [B, N, C]
+        '''
+
         x = self.proj(x)
+
+        '''
+        linear projection:
+        C -> C
+        merge the multi head info
+        '''
+
         x = self.proj_drop(x)
         return x
 
@@ -76,6 +138,9 @@ class Block(nn.Module):
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
+        '''
+        JHY: NOTE: hidden layer dimension = input dim * scalar
+        '''
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
@@ -83,6 +148,11 @@ class Block(nn.Module):
             dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
 
     def forward(self, x):
+        '''
+        JHY: NOTE:
+        drop path: either 0 or identity (based on probability)
+        -> either 0 or the original block
+        '''
         x = x + self.drop_path(self.attn(self.norm1(x)))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
@@ -107,6 +177,18 @@ class TransformerEncoder(nn.Module):
     def forward(self, x, pos):
         for _, block in enumerate(self.blocks):
             x = block(x + pos)
+
+            '''
+            JHY: NOTE:
+
+            each block add the pos encoding in the input
+
+            位置嵌入的多重作用：
+            每个块都会对输入特征进行不同的变换，通过在每个块中都加上位置嵌入，可以确保每个块都能获取到位置信息。这样可以让每个块都能利用位置嵌入信息进行特征提取，增强模型对位置的感知能力。
+            
+            增强模型的表达能力：
+            在每个块中加上位置嵌入，可以让模型在每一层都重新引入位置信息，从而提高模型的表达能力。这对于捕捉复杂的空间关系和细节非常重要。
+            '''
         return x
 
 
@@ -338,23 +420,153 @@ class PointTransformer_Colored(nn.Module):
 
         print_log(f'[Transformer] Successful Loading the ckpt from {bert_ckpt_path}', logger='Transformer')
 
-    def forward(self, pts):
+    def forward(self, pts, verbose=False):
+
+        if verbose:
+            print()
+            print("Inference start")
+            print("input shape:")
+            print(pts.shape)
+            '''
+            torch.Size([B, 8192 (N), 6])
+            '''
+
         # divide the point cloud in the same form. This is important
         neighborhood, center = self.group_divider(pts)
+
+        if verbose:
+            print("neighborhood, center = self.group_divider(pts)")
+            print(neighborhood.shape)
+            '''
+            torch.Size([B, 512, 32, 6])
+            '''
+            print(center.shape)
+            '''
+            torch.Size([B, 512, 3])
+            '''
+            
+            '''
+            最远点采样 FPS: 用于从点云中选择一组代表性点,这些点之间的距离尽可能大.这样可以确保这些点覆盖整个点云的空间分布.
+            k近邻 kNN: 对于每个通过FPS选择的代表点,找到其最近的k个邻居,形成一个局部区域neighborhood
+
+            has 512 groups, each group has 32 points, maybe have some overlapping
+
+            each center is only containing XYZ info, which is 3
+            '''
+
         # encoder the input cloud blocks
         group_input_tokens = self.encoder(neighborhood)  # B G N
+
+        if verbose:
+            print("group_input_tokens = self.encoder(neighborhood)")
+            print(group_input_tokens.shape)
+            '''
+            torch.Size([B, 512, 256])
+            '''
+
+            '''
+            每个分组32 points进行编码,将每个分组编码成一个 256 维的向量。
+            在 PointBERT 中，这个编码过程通常是通过 PointNet++ 实现的. PointNet++ 使用一个MLP对每个分组的点进行特征提取和聚合,最终得到一个固定维度的向量.
+            '''
+
         group_input_tokens = self.reduce_dim(group_input_tokens)
+
+        if verbose:
+            print("group_input_tokens = self.reduce_dim(group_input_tokens)")
+            print(group_input_tokens.shape)
+            '''
+            torch.Size([B, 512, 384])
+            '''
+
+            '''
+            Linear: 256 -> 384
+            '''
+
         # prepare cls
         cls_tokens = self.cls_token.expand(group_input_tokens.size(0), -1, -1)
         cls_pos = self.cls_pos.expand(group_input_tokens.size(0), -1, -1)
+
+        if verbose:
+            print("cls_tokens = self.cls_token.expand(group_input_tokens.size(0), -1, -1)")
+            print(cls_tokens.shape)
+            '''
+            [1, 1, 384] ->
+            [B, 1, 384]
+            '''
+            print("cls_pos = self.cls_pos.expand(group_input_tokens.size(0), -1, -1)")
+            print(cls_pos.shape)
+            '''
+            [1, 1, 384] ->
+            [B, 1, 384]
+            '''
+
         # add pos embedding
         pos = self.pos_embed(center)
+
+        if verbose:
+            print("pos = self.pos_embed(center)")
+            print(pos.shape)
+            '''
+            torch.Size([B, 512, 384])
+            '''
+
+            '''
+            MLP: 3 -> 128 -> 384
+            '''
+
         # final input
         x = torch.cat((cls_tokens, group_input_tokens), dim=1)
         pos = torch.cat((cls_pos, pos), dim=1)
+
+        if verbose:
+            print("x = torch.cat((cls_tokens, group_input_tokens), dim=1)")
+            print(x.shape)
+            '''
+            torch.Size([B, 1+512, 384])
+            '''
+            print("pos = torch.cat((cls_pos, pos), dim=1)")
+            print(pos.shape)
+            '''
+            torch.Size([B, 1+512, 384])
+            '''
+
         # transformer
         x = self.blocks(x, pos)
+
+        if verbose:
+            print("x = self.blocks(x, pos)")
+            print(x.shape)
+            '''
+            torch.Size([B, 513, 384])
+            '''
+
+            '''
+            standard Transformer block
+            output dim same as input
+            '''
+
         x = self.norm(x)
+
+        # JHY: NOTE: here
+
         concat_f = torch.cat([x[:, 0], x[:, 1:].max(1)[0]], dim=-1)
+
+        if verbose:
+            print("concat_f = torch.cat([x[:, 0], x[:, 1:].max(1)[0]], dim=-1)")
+            print(concat_f.shape)
+            '''
+            torch.Size([B, 768])
+            384 (cls head) + 384 max of each dimension of all the tokens
+            '''
+
+            '''
+            通过 x[:, 1:].max(1) 操作，你得到两个张量：
+
+            第一个张量包含了每个特征维度的最大值。
+            第二个张量包含了这些最大值在原始张量中的索引。
+
+            最大池化操作 max pooling 和全局平均池化 global average pooling 在目的上是相似的，都是为了从一组特征中提取出具有代表性的特征来生成最终的特征表示。
+            '''
+
         # ret = self.cls_head_finetune(concat_f)
         return concat_f

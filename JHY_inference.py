@@ -21,7 +21,7 @@ def create_fake_args():
     # fake_args.npoints = 8192
     fake_args.npoints = 10000
     fake_args.model = 'ULIP2_PointBERT_Colored'
-    fake_args.gpu = 1
+    fake_args.gpu = 0
     # fake_args.test_ckpt_addr = './pretrained_models/pointbert_ULIP-2.pt'
     fake_args.test_ckpt_addr = './pretrained_models/ULIP-2-PointBERT-10k-colored-pc-pretrained.pt'
     fake_args.evaluate_3d_ulip2 = True
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     path_data = "/mnt/disk2/iLori/ShapeNet-55-ULIP-2-triplets"
     path_data_pc = os.path.join(path_data, "shapenet_pc")
     path_data_pc_embeddings = os.path.join(path_data, "ulip_pc_embeddings")
-    if_test = False
+    if_test = True
 
     main(path_data_pc, path_data_pc_embeddings, if_test=if_test)
 
